@@ -25,30 +25,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
     // Prevent redirection loop using a session flag
     if (!isset($_SESSION['form_submitted'])) {
         // Get form data with validation
-        $first_name = isset($_POST['first_name']) ? trim($_POST['first_name']) : NULL;
-        $last_name = isset($_POST['last_name']) ? trim($_POST['last_name']) : NULL;
-        $age = isset($_POST['age']) ? trim($_POST['age']) : NULL;
-        $birthdate = isset($_POST['birthdate']) ? trim($_POST['birthdate']) : NULL;
-        $address = isset($_POST['address']) ? trim($_POST['address']) : NULL;
-        $email = isset($_POST['email']) ? trim($_POST['email']) : NULL;
-        $phone_num = isset($_POST['phone_num']) ? trim($_POST['phone_num']) : NULL;
-        $bussiness_name = isset($_POST['bussiness_name']) ? trim($_POST['bussiness_name']) : NULL;
-        $bussiness_type = isset($_POST['bussiness_type']) ? trim($_POST['bussiness_type']) : NULL;
+        $first_name = isset($_POST['first_name']) && !empty(trim($_POST['first_name'])) ? trim($_POST['first_name']) : NULL;
+        $last_name = isset($_POST['last_name']) && !empty(trim($_POST['last_name'])) ? trim($_POST['last_name']) : NULL;
+        $age = isset($_POST['age']) && !empty(trim($_POST['age'])) ? trim($_POST['age']) : NULL;
+        $birthdate = isset($_POST['birthdate']) && !empty(trim($_POST['birthdate'])) ? trim($_POST['birthdate']) : NULL;
+        $address = isset($_POST['address']) && !empty(trim($_POST['address'])) ? trim($_POST['address']) : NULL;
+        $email = isset($_POST['email']) && !empty(trim($_POST['email'])) ? trim($_POST['email']) : NULL;
+        $phone_num = isset($_POST['phone_num']) && !empty(trim($_POST['phone_num'])) ? trim($_POST['phone_num']) : NULL;
+        $bussiness_name = isset($_POST['bussiness_name']) && !empty(trim($_POST['bussiness_name'])) ? trim($_POST['bussiness_name']) : NULL;
+        $bussiness_type = isset($_POST['bussiness_type']) && !empty(trim($_POST['bussiness_type'])) ? trim($_POST['bussiness_type']) : NULL;
+    
 
-
-        // Check for duplicate email
-        $email_check_query = "SELECT user_id FROM users WHERE email = ? AND user_id != ?";
-        $stmt_check = $conn->prepare($email_check_query);
-        $stmt_check->bind_param("si", $email, $user_id);
-        $stmt_check->execute();
-        $result_check = $stmt_check->get_result();
-
-        if ($result_check->num_rows > 0) {
-            echo "Error: The email address is already in use.";
+        $first_name = isset($_POST['first_name']) && !empty(trim($_POST['first_name'])) ? trim($_POST['first_name']) : NULL;
+        $last_name = isset($_POST['last_name']) && !empty(trim($_POST['last_name'])) ? trim($_POST['last_name']) : NULL;
+        $age = isset($_POST['age']) && !empty(trim($_POST['age'])) ? trim($_POST['age']) : NULL;
+        $birthdate = isset($_POST['birthdate']) && !empty(trim($_POST['birthdate'])) ? trim($_POST['birthdate']) : NULL;
+        $address = isset($_POST['address']) && !empty(trim($_POST['address'])) ? trim($_POST['address']) : NULL;
+        $email = isset($_POST['email']) && !empty(trim($_POST['email'])) ? trim($_POST['email']) : NULL;
+        $phone_num = isset($_POST['phone_num']) && !empty(trim($_POST['phone_num'])) ? trim($_POST['phone_num']) : NULL;
+        $bussiness_name = isset($_POST['bussiness_name']) && !empty(trim($_POST['bussiness_name'])) ? trim($_POST['bussiness_name']) : NULL;
+        $bussiness_type = isset($_POST['bussiness_type']) && !empty(trim($_POST['bussiness_type'])) ? trim($_POST['bussiness_type']) : NULL;
+    
+        // Retrieve the current user details
+        $user_query = "SELECT * FROM users WHERE user_id = ?";
+        $stmt_user = $conn->prepare($user_query);
+        $stmt_user->bind_param("i", $user_id);
+        $stmt_user->execute();
+        $current_user = $stmt_user->get_result()->fetch_assoc();
+        $stmt_user->close();
+    
+        // Use current values if fields are left blank
+        $first_name = $first_name ?? $current_user['first_name'];
+        $last_name = $last_name ?? $current_user['last_name'];
+        $age = $age ?? $current_user['age'];
+        $birthdate = $birthdate ?? $current_user['birthdate'];
+        $address = $address ?? $current_user['address'];
+        $email = $email ?? $current_user['email'];
+        $phone_num = $phone_num ?? $current_user['phone_num'];
+        $bussiness_name = $bussiness_name ?? $current_user['bussiness_name'];
+        $bussiness_type = $bussiness_type ?? $current_user['bussiness_type'];
+    
+        // Check for duplicate email if the email is changed
+        if ($email !== $current_user['email']) {
+            $email_check_query = "SELECT user_id FROM users WHERE email = ?";
+            $stmt_check = $conn->prepare($email_check_query);
+            $stmt_check->bind_param("s", $email);
+            $stmt_check->execute();
+            $result_check = $stmt_check->get_result();
+    
+            if ($result_check->num_rows > 0) {
+                echo "Error: The email address is already in use.";
+                $stmt_check->close();
+                exit();
+            }
             $stmt_check->close();
-            exit();
         }
-        $stmt_check->close();
 
         // Update user data in the database, including the file path
         $sql = "UPDATE users 

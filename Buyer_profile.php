@@ -15,63 +15,84 @@ if (!isset($_SESSION['user_id'])) {
 // Get the logged-in user's ID securely
 $user_id = intval($_SESSION['user_id']); // Convert to integer for safety
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Prevent duplicate updates using a session flag
-    if (!isset($_SESSION['update_submitted'])) {
-        // Get form data
-        $first_name = $_POST['first_name'];
-        $last_name = $_POST['last_name'];
-        $email = $_POST['email'];
-        $age = $_POST['age'];
-        $birthdate = $_POST['birthdate'];
-        $phone_num = $_POST['phone_num'];
-        $address = $_POST['address'];
-        $user_image = NULL;
+if (!$conn) {
+    die("Database connection failed: " . mysqli_connect_error());
+}
 
-        // Handle image upload
-        if (isset($_FILES['user_image']) && $_FILES['user_image']['error'] === UPLOAD_ERR_OK) {
-            // Validate the uploaded file
-            $fileType = mime_content_type($_FILES['user_image']['tmp_name']);
-            if (strpos($fileType, 'image/') === 0) {
-                $user_image = file_get_contents($_FILES['user_image']['tmp_name']);
-            } else {
-                echo "Invalid file type. Please upload an image.";
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
+    // Prevent redirection loop using a session flag
+    if (!isset($_SESSION['form_submitted'])) {
+        // Get form data with validation
+        $first_name = isset($_POST['first_name']) && !empty(trim($_POST['first_name'])) ? trim($_POST['first_name']) : NULL;
+        $last_name = isset($_POST['last_name']) && !empty(trim($_POST['last_name'])) ? trim($_POST['last_name']) : NULL;
+        $age = isset($_POST['age']) && !empty(trim($_POST['age'])) ? trim($_POST['age']) : NULL;
+        $birthdate = isset($_POST['birthdate']) && !empty(trim($_POST['birthdate'])) ? trim($_POST['birthdate']) : NULL;
+        $address = isset($_POST['address']) && !empty(trim($_POST['address'])) ? trim($_POST['address']) : NULL;
+        $email = isset($_POST['email']) && !empty(trim($_POST['email'])) ? trim($_POST['email']) : NULL;
+        $phone_num = isset($_POST['phone_num']) && !empty(trim($_POST['phone_num'])) ? trim($_POST['phone_num']) : NULL;
+ 
+
+        $first_name = isset($_POST['first_name']) && !empty(trim($_POST['first_name'])) ? trim($_POST['first_name']) : NULL;
+        $last_name = isset($_POST['last_name']) && !empty(trim($_POST['last_name'])) ? trim($_POST['last_name']) : NULL;
+        $age = isset($_POST['age']) && !empty(trim($_POST['age'])) ? trim($_POST['age']) : NULL;
+        $birthdate = isset($_POST['birthdate']) && !empty(trim($_POST['birthdate'])) ? trim($_POST['birthdate']) : NULL;
+        $address = isset($_POST['address']) && !empty(trim($_POST['address'])) ? trim($_POST['address']) : NULL;
+        $email = isset($_POST['email']) && !empty(trim($_POST['email'])) ? trim($_POST['email']) : NULL;
+        $phone_num = isset($_POST['phone_num']) && !empty(trim($_POST['phone_num'])) ? trim($_POST['phone_num']) : NULL;
+  
+        // Retrieve the current user details
+        $user_query = "SELECT * FROM users WHERE user_id = ?";
+        $stmt_user = $conn->prepare($user_query);
+        $stmt_user->bind_param("i", $user_id);
+        $stmt_user->execute();
+        $current_user = $stmt_user->get_result()->fetch_assoc();
+        $stmt_user->close();
+    
+        // Use current values if fields are left blank
+        $first_name = $first_name ?? $current_user['first_name'];
+        $last_name = $last_name ?? $current_user['last_name'];
+        $age = $age ?? $current_user['age'];
+        $birthdate = $birthdate ?? $current_user['birthdate'];
+        $address = $address ?? $current_user['address'];
+        $email = $email ?? $current_user['email'];
+        $phone_num = $phone_num ?? $current_user['phone_num'];
+
+    
+        // Check for duplicate email if the email is changed
+        if ($email !== $current_user['email']) {
+            $email_check_query = "SELECT user_id FROM users WHERE email = ?";
+            $stmt_check = $conn->prepare($email_check_query);
+            $stmt_check->bind_param("s", $email);
+            $stmt_check->execute();
+            $result_check = $stmt_check->get_result();
+    
+            if ($result_check->num_rows > 0) {
+                echo "Error: The email address is already in use.";
+                $stmt_check->close();
                 exit();
             }
+            $stmt_check->close();
         }
 
-        // Prepare the SQL query for updating user details
-        if ($user_image) {
-            $sql = "UPDATE users 
-                    SET first_name = ?, 
-                        last_name = ?, 
-                        email = ?, 
-                        age = ?, 
-                        birthdate = ?, 
-                        phone_num = ?, 
-                        address = ?, 
-                        user_image = ? 
-                    WHERE user_id = ?";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("ssssssssi", $first_name, $last_name, $email, $age, $birthdate, $phone_num, $address, $user_image, $user_id);
-        } else {
-            $sql = "UPDATE users 
-                    SET first_name = ?, 
-                        last_name = ?, 
-                        email = ?, 
-                        age = ?, 
-                        birthdate = ?, 
-                        phone_num = ?, 
-                        address = ? 
-                    WHERE user_id = ?";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sssssssi", $first_name, $last_name, $email, $age, $birthdate, $phone_num, $address, $user_id);
-        }
+        // Update user data in the database, including the file path
+        $sql = "UPDATE users 
+                SET first_name = ?, 
+                    last_name = ?, 
+                    age = ?, 
+                    birthdate = ?, 
+                    address = ?, 
+                    email = ?, 
+                    phone_num = ?
+                WHERE user_id = ?";
 
-        // Execute the statement
+        // Bind the parameters and execute the update query
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ssssssii", $first_name, $last_name, $age, $birthdate, $address, $email, $phone_num, $user_id);
+
         if ($stmt->execute()) {
-            // Set session flag to prevent duplicate updates
-            $_SESSION['update_submitted'] = true;
+            // Set session flag to prevent reprocessing
+            $_SESSION['form_submitted'] = true;
 
             // Redirect after success
             header("Location: Buyer_profile.php");
@@ -83,24 +104,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Close the prepared statement
         $stmt->close();
     } else {
-        // Clear the flag and redirect
-        unset($_SESSION['update_submitted']);
+        // Form already submitted; clear the flag and redirect
+        unset($_SESSION['form_submitted']);
         header("Location: Buyer_profile.php");
         exit();
     }
 }
 
+if(isset($_POST['submit'])){
+    $file_name = $_FILES['image']['name'];
+    $tempname = $_FILES['image']['tmp_name'];
+    $folder = 'img/'.$file_name;
+
+    $query = mysqli_query($conn, "Insert into users (file) values ('$file_name')");
+
+    if(move_uploaded_file($tempname, $folder)){
+        echo "<h2> File uploaded successfully</h2>";
+    } else{
+        echo "<h2> File not uploaded</h2>";
+    }
+
+}
+
+
 // Fetch the user's image from the database securely
 try {
-    $sql = "SELECT user_image FROM users WHERE user_id = ?";
+    $sql = "SELECT file FROM users WHERE user_id = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($row = $result->fetch_assoc()) {
-        if ($row['user_image']) {
-            $profileImage = 'data:image/jpeg;base64,' . base64_encode($row['user_image']);
+        if ($row['file']) {
+            $profileImage = 'data:img/jpeg;base64,' . base64_encode($row['file']);
         } else {
             $profileImage = 'img/photo_edit.png'; // Default image
         }
@@ -157,16 +194,14 @@ try {
 
 
     <!-- Icon Font Stylesheet -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.1/font/bootstrap-icons.css" rel="stylesheet">
+
 
     <!-- Libraries Stylesheet -->
     <link href="lib/animate/animate.min.css" rel="stylesheet">
     <link href="lib/owlcarousel/assets/owl.carousel.min.css" rel="stylesheet">
     <link href="lib/tempusdominus/css/tempusdominus-bootstrap-4.min.css" rel="stylesheet" />
     <!-- Bootstrap CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/profile.css">
     
@@ -207,7 +242,7 @@ try {
                 <!-- Display the Profile Picture -->
                 <div class="profile-picture-container">
                     <img src="img/uriel1.png" alt="Profile Picture" id="profile-pic" onclick="document.getElementById('file-input').click();" style="cursor: pointer;">
-                    <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="previewImage(event)">
+                    <input type="file" name="file" id="file-input" accept="image/*" style="display: none;" onchange="previewImage(event)">
                 </div>
 
                     <a href="Buyer_profile.php" class="pb-4 name" style=";text-decoration: none; "><h5> <?php echo htmlspecialchars($first_name); ?></h5> 
@@ -270,11 +305,11 @@ try {
                 <div class="favorites-container" style="border: 2px solid #E95F5D; border-radius: 12px; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);">
 
 
-                    <form action="Buyer_profile.php" method="POST" enctype="multipart/form-data">
+                    <form method="POST" enctype="multipart/form-data">
                         <div class="profiles-picture-container">
                         <img src="img/photo_edit.png" alt="Profile Picture" id="profile-pic"
                             onclick="document.getElementById('file-input').click();" style="cursor: pointer;">
-                        <input type="file" id="file-input" name="image" accept="image/*" style="display: none;" onchange="previewImage(event)">
+                        <input type="file" id="file-input" name="file" accept="image/*" style="display: none;" onchange="previewImage(event)">
                         </div>
 
                         <script>
@@ -295,10 +330,10 @@ try {
                             
                         <div class="row">
                             <div class="col mb-4">
-                                <input type="text" name="first_name" class="form-control-lg w-100 transparent-border" id="first_name" placeholder="First Name" required>
+                                <input type="text" name="first_name" class="form-control-lg w-100 transparent-border" id="first_name" placeholder="First Name">
                             </div>
                             <div class="col mb-4">
-                                <input type="text" name="last_name" class="form-control-lg w-100 transparent-border" id="last_name" placeholder="Last Name" required>
+                                <input type="text" name="last_name" class="form-control-lg w-100 transparent-border" id="last_name" placeholder="Last Name" >
                             </div>
                         </div>
 
@@ -316,7 +351,7 @@ try {
                         </div>
 
                         <div class="mb-4 w-100">
-                            <input type="email" name="email" class="form-control-lg w-100 transparent-border" id="email" placeholder="Email" required>
+                            <input type="email" name="email" class="form-control-lg w-100 transparent-border" id="email" placeholder="Email" >
                         </div>
 
                         <div class="mb-3">
@@ -335,8 +370,8 @@ try {
     </div>
 
     <!-- Bootstrap JS and dependencies -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
     <script src="js/main.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>

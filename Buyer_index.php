@@ -20,20 +20,23 @@ if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 
+
 try {
-    // Fetch user details (example query)
     $sql = "SELECT * FROM users WHERE user_id = ?";
     $stmt = $conn->prepare($sql);
-    if (!$stmt) {
-        throw new Exception("Failed to prepare statement: " . $conn->error);
-    }
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($result->num_rows > 0) {
+        // Fetch user data
         $user = $result->fetch_assoc();
-        $first_name = htmlspecialchars($user['first_name']); // Use data securely
+        $stmt->close();
+
+        // Check if bussiness_name exists and is not NULL
+       
+        $first_name = htmlspecialchars($user['first_name']);
+      
     } else {
         // User not found
         session_destroy(); // Clear session
@@ -41,21 +44,11 @@ try {
         exit();
     }
 } catch (Exception $e) {
-    echo "Error: " . $e->getMessage(); // Display the error message for debugging
+    echo "Error fetching user details: " . $e->getMessage();
 }
 
-try {
-    // Fetch products from the database (using the products table)
-    $sql = "SELECT * FROM products";
-    $result = mysqli_query($conn, $sql);
-    if (!$result) {
-        throw new Exception("Failed to fetch products: " . mysqli_error($conn));
-    }
-} catch (Exception $e) {
-    echo "Error: " . $e->getMessage(); // Display the error message for debugging
-}
+
 ?>
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -150,7 +143,7 @@ try {
                         <div class="col-lg-6 text-center text-lg-start">
                             <h1 class="display-3 animated slideInLeft" style="color: #E95F5D;">Rescue, Savor, and Share</h1>
                             <p class="animated slideInLeft mb-4 pb-2" style="color: #E95F5D;">Cuts waste and will delight your plate!</p>
-                            <h3>Welcome Buyer! <?php echo $first_name; ?></h3>
+                            <h3>Welcome Buyer! <?php echo htmlspecialchars($first_name); ?></h3>
                             <!-- Search Bar -->
                             <div class="d-flex">
                                 <div class="form-outline flex-grow-1">
